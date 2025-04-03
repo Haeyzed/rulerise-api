@@ -25,14 +25,6 @@ class CandidateProfileResource extends JsonResource
             'id' => $this->id,
 
             /**
-             * The user ID associated with this profile.
-             *
-             * @var int $user_id
-             * @example 1
-             */
-            'user_id' => $this->user_id,
-
-            /**
              * The user details associated with this profile.
              *
              * @var array|null $user
@@ -128,14 +120,6 @@ class CandidateProfileResource extends JsonResource
             'salary_currency' => $this->salary_currency,
 
             /**
-             * The education level ID of the candidate.
-             *
-             * @var int|null $education_level_id
-             * @example 3
-             */
-            'education_level_id' => $this->education_level_id,
-
-            /**
              * The education level details of the candidate.
              *
              * @var array|null $education_level
@@ -151,14 +135,6 @@ class CandidateProfileResource extends JsonResource
             'address' => $this->address,
 
             /**
-             * The city ID of the candidate.
-             *
-             * @var int|null $city_id
-             * @example 1
-             */
-            'city_id' => $this->city_id,
-
-            /**
              * The city details of the candidate.
              *
              * @var array|null $city
@@ -166,27 +142,11 @@ class CandidateProfileResource extends JsonResource
             'city' => new CityResource($this->whenLoaded('city')),
 
             /**
-             * The state ID of the candidate.
-             *
-             * @var int|null $state_id
-             * @example 1
-             */
-            'state_id' => $this->state_id,
-
-            /**
              * The state details of the candidate.
              *
              * @var array|null $state
              */
             'state' => new StateResource($this->whenLoaded('state')),
-
-            /**
-             * The country ID of the candidate.
-             *
-             * @var int|null $country_id
-             * @example 1
-             */
-            'country_id' => $this->country_id,
 
             /**
              * The country details of the candidate.

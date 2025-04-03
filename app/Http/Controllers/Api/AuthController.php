@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\CompanyResource;
 use App\Services\AuthService;
 use App\Http\Requests\RegisterRequest;
+use App\Http\Requests\CandidateRegisterRequest;
+use App\Http\Requests\EmployerRegisterRequest;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\PasswordResetRequest;
 use App\Http\Requests\PasswordUpdateRequest;
@@ -38,38 +40,18 @@ class AuthController extends Controller implements HasMiddleware
     protected UserService $userService;
 
     /**
-     * The candidate service instance.
-     *
-     * @var CandidateService
-     */
-    protected CandidateService $candidateService;
-
-    /**
-     * The company service instance.
-     *
-     * @var CompanyService
-     */
-    protected CompanyService $companyService;
-
-    /**
      * Create a new controller instance.
      *
      * @param AuthService $authService
      * @param UserService $userService
-     * @param CandidateService $candidateService
-     * @param CompanyService $companyService
      * @return void
      */
     public function __construct(
         AuthService $authService,
-        UserService $userService,
-        CandidateService $candidateService,
-        CompanyService $companyService
+        UserService $userService
     ) {
         $this->authService = $authService;
         $this->userService = $userService;
-        $this->candidateService = $candidateService;
-        $this->companyService = $companyService;
     }
 
     /**
@@ -125,7 +107,7 @@ class AuthController extends Controller implements HasMiddleware
     /**
      * Register a new candidate (jobseeker).
      *
-     * @param RegisterRequest $request
+     * @param CandidateRegisterRequest $request
      * @return JsonResponse
      * @response array{
      *     status: boolean,
@@ -138,36 +120,12 @@ class AuthController extends Controller implements HasMiddleware
      *     }
      * }
      */
-    public function registerCandidate(RegisterRequest $request): JsonResponse
+    public function registerCandidate(CandidateRegisterRequest $request): JsonResponse
     {
-        // Force the role to be candidate
-        $data = $request->validated();
-        $data['role'] = UserRoleEnum::CANDIDATE->value;
-
-        // Create the user
-        $user = $this->authService->register($data);
-        $user->load('candidateProfile', 'roles', 'permissions');
-
-        // Create or update candidate profile with additional information
-        if (isset($data['candidate_profile']) && is_array($data['candidate_profile'])) {
-            $this->candidateService->update($user->candidateProfile, $data['candidate_profile']);
-        }
-
-        // Add skills if provided
-        if (isset($data['skills']) && is_array($data['skills'])) {
-            foreach ($data['skills'] as $skill) {
-                $this->candidateService->addOrUpdateSkill($user->candidateProfile, $skill);
-            }
-        }
-
-        // Login the user
-        $result = $this->authService->login([
-            'email' => $request->email,
-            'password' => $request->password
-        ]);
+        $result = $this->authService->registerCandidate($request->validated());
 
         return response()->created([
-            'user' => new UserResource($user),
+            'user' => new UserResource($result['user']),
             'token' => $result['token'],
             'token_type' => $result['token_type'],
             'expires_in' => $result['expires_in'],
@@ -177,7 +135,7 @@ class AuthController extends Controller implements HasMiddleware
     /**
      * Register a new employer.
      *
-     * @param RegisterRequest $request
+     * @param EmployerRegisterRequest $request
      * @return JsonResponse
      * @response array{
      *     status: boolean,
@@ -186,56 +144,18 @@ class AuthController extends Controller implements HasMiddleware
      *     token_type: string,
      *     expires_in: string,
      *     data: array{
-     *         user: UserResource
+     *         user: UserResource,
+     *         company: CompanyResource
      *     }
      * }
      */
-    public function registerEmployer(RegisterRequest $request): JsonResponse
+    public function registerEmployer(EmployerRegisterRequest $request): JsonResponse
     {
-        // Force the role to be employer
-        $data = $request->validated();
-        $data['role'] = UserRoleEnum::EMPLOYER->value;
-
-        // Create the user
-        $user = $this->authService->register($data);
-
-        // Create company with provided information
-        $companyData = [
-            'user_id' => $user->id,
-            'name' => $data['company_name'],
-            'industry' => $data['company_industry'] ?? null,
-            'company_size_id' => $data['company_size_id'] ?? null,
-            'founded_year' => $data['company_founded_year'] ?? null,
-            'website' => $data['company_website'] ?? null,
-            'email' => $data['company_email'] ?? null,
-            'phone' => $data['company_phone'] ?? null,
-            'address' => $data['company_address'] ?? null,
-            'city_id' => $data['company_city_id'] ?? null,
-            'state_id' => $data['company_state_id'] ?? null,
-            'country_id' => $data['company_country_id'] ?? null,
-            'postal_code' => $data['company_postal_code'] ?? null,
-            'description' => $data['company_description'] ?? null,
-        ];
-
-        // Handle company logo if provided
-        if (isset($data['company_logo'])) {
-            $companyData['logo'] = $data['company_logo'];
-        }
-
-        $company = $this->companyService->create($companyData);
-
-        // Load relationships
-        $user->load(['companies', 'roles', 'permissions']);
-
-        // Login the user
-        $result = $this->authService->login([
-            'email' => $request->email,
-            'password' => $request->password
-        ]);
+        $result = $this->authService->registerEmployer($request->validated());
 
         return response()->created([
-            'user' => new UserResource($user),
-            'company' => new CompanyResource($company),
+            'user' => new UserResource($result['user']),
+            'company' => new CompanyResource($result['company']),
             'token' => $result['token'],
             'token_type' => $result['token_type'],
             'expires_in' => $result['expires_in'],

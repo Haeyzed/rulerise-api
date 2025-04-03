@@ -19,6 +19,7 @@ class CandidateSkill extends Model
     protected $fillable = [
         'candidate_id',
         'skill_id',
+        'level',
         'proficiency_level',
     ];
 

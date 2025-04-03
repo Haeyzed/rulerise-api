@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class CandidateService
@@ -37,11 +38,11 @@ class CandidateService
                 $search = $filters['search'];
                 $query->whereHas('user', function ($q) use ($search) {
                     $q->where('first_name', 'like', "%{$search}%")
-                      ->orWhere('last_name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
                 })
-                ->orWhere('title', 'like', "%{$search}%")
-                ->orWhere('bio', 'like', "%{$search}%");
+                    ->orWhere('title', 'like', "%{$search}%")
+                    ->orWhere('bio', 'like', "%{$search}%");
             })
             ->when(isset($filters['education_level_id']), function ($query) use ($filters) {
                 $query->where('education_level_id', $filters['education_level_id']);
@@ -61,8 +62,8 @@ class CandidateService
             ->when(isset($filters['location']), function ($query) use ($filters) {
                 $query->where(function ($q) use ($filters) {
                     $q->where('city', 'like', "%{$filters['location']}%")
-                      ->orWhere('state', 'like', "%{$filters['location']}%")
-                      ->orWhere('country', 'like', "%{$filters['location']}%");
+                        ->orWhere('state', 'like', "%{$filters['location']}%")
+                        ->orWhere('country', 'like', "%{$filters['location']}%");
                 });
             })
             ->when(isset($filters['country']), function ($query) use ($filters) {
@@ -108,10 +109,7 @@ class CandidateService
             // Add skills if provided
             if (isset($data['skills']) && is_array($data['skills'])) {
                 foreach ($data['skills'] as $skill) {
-                    $candidateProfile->skills()->create([
-                        'skill_id' => $skill['skill_id'],
-                        'proficiency_level' => $skill['proficiency_level'] ?? null,
-                    ]);
+                    $this->addOrUpdateSkill($candidateProfile, $skill);
                 }
             }
 
@@ -180,22 +178,46 @@ class CandidateService
      */
     public function addOrUpdateSkill(CandidateProfile $candidateProfile, array $data): CandidateSkill
     {
-        $skill = $candidateProfile->skills()
-            ->where('skill_id', $data['skill_id'])
-            ->first();
+        try {
+            // Check if skill_id exists in the data
+            $skillId = $data['id'] ?? $data['skill_id'] ?? null;
 
-        if ($skill) {
-            $skill->update([
-                'proficiency_level' => $data['proficiency_level'] ?? null,
+            if (!$skillId) {
+                throw new \InvalidArgumentException("Skill ID is required");
+            }
+
+            // Find existing skill or create new one
+            $candidateSkill = $candidateProfile->skills()
+                ->where('skill_id', $skillId)
+                ->first();
+
+            if (!$candidateSkill) {
+                $candidateSkill = new CandidateSkill([
+                    'candidate_id' => $candidateProfile->id,
+                    'skill_id' => $skillId,
+                ]);
+            }
+
+            // Update level if provided
+            if (isset($data['level'])) {
+                $candidateSkill->level = $data['level'];
+            }
+
+            // Update proficiency_level if provided
+            if (isset($data['proficiency_level'])) {
+                $candidateSkill->proficiency_level = $data['proficiency_level'];
+            }
+
+            $candidateSkill->save();
+            return $candidateSkill;
+        } catch (\Exception $e) {
+            Log::error('Error adding/updating candidate skill: ' . $e->getMessage(), [
+                'candidate_id' => $candidateProfile->id,
+                'skill_data' => $data,
+                'exception' => $e
             ]);
-        } else {
-            $skill = $candidateProfile->skills()->create([
-                'skill_id' => $data['skill_id'],
-                'proficiency_level' => $data['proficiency_level'] ?? null,
-            ]);
+            throw $e;
         }
-
-        return $skill;
     }
 
     /**
@@ -210,6 +232,25 @@ class CandidateService
         return $candidateProfile->skills()
             ->where('skill_id', $skillId)
             ->delete();
+    }
+
+    /**
+     * Update multiple skills for a candidate.
+     *
+     * @param CandidateProfile $candidateProfile
+     * @param array $skills
+     * @return array
+     */
+    public function updateSkills(CandidateProfile $candidateProfile, array $skills): array
+    {
+        return DB::transaction(function () use ($candidateProfile, $skills) {
+            $updatedSkills = [];
+            foreach ($skills as $skillData) {
+                $updatedSkills[] = $this->addOrUpdateSkill($candidateProfile, $skillData);
+            }
+
+            return $updatedSkills;
+        });
     }
 
     /**
@@ -592,7 +633,7 @@ class CandidateService
             ->when($job->education_level_id, function ($query) use ($job) {
                 $query->where(function ($q) use ($job) {
                     $q->where('education_level_id', '>=', $job->education_level_id)
-                      ->orWhereNull('education_level_id');
+                        ->orWhereNull('education_level_id');
                 });
             })
             ->when($jobSkillIds, function ($query) use ($jobSkillIds) {
@@ -723,4 +764,3 @@ class CandidateService
             ->get();
     }
 }
-

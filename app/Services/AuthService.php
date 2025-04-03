@@ -31,13 +31,30 @@ class AuthService
     protected StorageService $storageService;
 
     /**
-     * BlogPostService constructor.
+     * @var CandidateService
+     */
+    protected CandidateService $candidateService;
+
+    /**
+     * @var CompanyService
+     */
+    protected CompanyService $companyService;
+
+    /**
+     * AuthService constructor.
      *
      * @param StorageService $storageService
+     * @param CandidateService|null $candidateService
+     * @param CompanyService|null $companyService
      */
-    public function __construct(StorageService $storageService)
-    {
+    public function __construct(
+        StorageService $storageService,
+        CandidateService $candidateService = null,
+        CompanyService $companyService = null
+    ) {
         $this->storageService = $storageService;
+        $this->candidateService = $candidateService ?? app(CandidateService::class);
+        $this->companyService = $companyService ?? app(CompanyService::class);
     }
 
     /**
@@ -70,7 +87,7 @@ class AuthService
                     'headline' => $data['headline'] ?? null,
                     'education_level_id' => $data['education_level_id'] ?? null,
                 ];
-                
+
                 $user->candidateProfile()->create($candidateData);
             }
 
@@ -91,8 +108,9 @@ class AuthService
                     'city_id' => $data['company_city_id'] ?? null,
                     'state_id' => $data['company_state_id'] ?? null,
                     'country_id' => $data['company_country_id'] ?? null,
+                    'postal_code' => $data['company_postal_code'] ?? null,
                 ];
-                
+
                 // Handle logo upload if provided
                 if (isset($data['company_logo']) && $data['company_logo'] instanceof UploadedFile) {
                     $companyData['logo'] = $this->uploadImage(
@@ -100,7 +118,7 @@ class AuthService
                         config('filestorage.paths.company_logos')
                     );
                 }
-                
+
                 $user->companies()->create($companyData);
             }
 
@@ -114,6 +132,83 @@ class AuthService
             event(new Registered($user));
 
             return $user;
+        });
+    }
+
+    /**
+     * Register a new candidate.
+     *
+     * @param array $data
+     * @return array
+     */
+    public function registerCandidate(array $data): array
+    {
+        return DB::transaction(function () use ($data) {
+            // Ensure role is set to candidate
+            $data['role'] = UserRoleEnum::CANDIDATE->value;
+
+            // Create the user
+            $user = $this->register($data);
+
+            // Process skills if provided
+            if (isset($data['skills']) && is_array($data['skills'])) {
+                foreach ($data['skills'] as $skill) {
+                    $this->candidateService->addOrUpdateSkill($user->candidateProfile, $skill);
+                }
+            }
+
+            // Load relationships
+            $user->load('candidateProfile', 'candidateProfile.skills', 'candidateProfile.skills.skill', 'roles', 'permissions');
+
+            // Login the user
+            $loginResult = $this->login([
+                'email' => $data['email'],
+                'password' => $data['password']
+            ]);
+
+            return [
+                'user' => $user,
+                'token' => $loginResult['token'],
+                'token_type' => $loginResult['token_type'],
+                'expires_in' => $loginResult['expires_in'],
+            ];
+        });
+    }
+
+    /**
+     * Register a new employer.
+     *
+     * @param array $data
+     * @return array
+     */
+    public function registerEmployer(array $data): array
+    {
+        return DB::transaction(function () use ($data) {
+            // Ensure role is set to employer
+            $data['role'] = UserRoleEnum::EMPLOYER->value;
+
+            // Create the user
+            $user = $this->register($data);
+
+            // Get the company that was created during registration
+            $company = $user->companies()->first();
+
+            // Load relationships
+            $user->load('companies', 'roles', 'permissions');
+
+            // Login the user
+            $loginResult = $this->login([
+                'email' => $data['email'],
+                'password' => $data['password']
+            ]);
+
+            return [
+                'user' => $user,
+                'company' => $company,
+                'token' => $loginResult['token'],
+                'token_type' => $loginResult['token_type'],
+                'expires_in' => $loginResult['expires_in'],
+            ];
         });
     }
 
@@ -179,7 +274,7 @@ class AuthService
     {
         try {
             $token = JWTAuth::refresh(JWTAuth::getToken());
-            
+
             return [
                 'token' => $token,
                 'token_type' => 'bearer',
@@ -201,7 +296,7 @@ class AuthService
         $status = Password::sendResetLink(['email' => $email], function ($user, $token) {
             $user->notify(new ResetPasswordNotification($token));
         });
-        
+
         return $status;
     }
 
@@ -219,13 +314,13 @@ class AuthService
                 $user->forceFill([
                     'password' => Hash::make($password)
                 ])->setRememberToken(Str::random(60));
-                
+
                 $user->save();
-                
+
                 event(new PasswordReset($user));
             }
         );
-        
+
         return $status;
     }
 
@@ -243,12 +338,12 @@ class AuthService
         if (!Hash::check($currentPassword, $user->password)) {
             return false;
         }
-        
+
         // Update password
         $user->update([
             'password' => Hash::make($newPassword)
         ]);
-        
+
         return true;
     }
 
@@ -262,17 +357,17 @@ class AuthService
     public function verifyEmail(string $id, string $hash): bool
     {
         $user = User::query()->find($id);
-        
+
         if (!$user || !hash_equals((string) $hash, sha1($user->getEmailForVerification()))) {
             return false;
         }
-        
+
         if ($user->hasVerifiedEmail()) {
             return true;
         }
-        
+
         $user->markEmailAsVerified();
-        
+
         return true;
     }
 
@@ -287,9 +382,9 @@ class AuthService
         if ($user->hasVerifiedEmail()) {
             return false;
         }
-        
+
         $user->notify(new VerifyEmailNotification);
-        
+
         return true;
     }
 
@@ -306,7 +401,7 @@ class AuthService
             'permissions' => $user->getAllPermissions()->pluck('name'),
             'roles' => $user->roles->pluck('name'),
         ];
-        
+
         if ($user->role->value === UserRoleEnum::CANDIDATE->value) {
             $profile['candidate_profile'] = $user->candidateProfile()->with([
                 'educationLevel',
@@ -326,7 +421,7 @@ class AuthService
                 'city',
             ])->get();
         }
-        
+
         return $profile;
     }
 
@@ -346,7 +441,7 @@ class AuthService
                 'last_name' => $data['last_name'] ?? $user->last_name,
                 'phone' => $data['phone'] ?? $user->phone,
             ]);
-            
+
             // Handle profile picture upload
             if (isset($data['profile_picture']) && $data['profile_picture'] instanceof \Illuminate\Http\UploadedFile) {
                 // Delete old profile picture if exists
@@ -358,10 +453,10 @@ class AuthService
                     $data['profile_picture'],
                     config('filestorage.paths.profile_pictures')
                 );
-                
+
                 $user->update(['profile_picture' => $data['profile_picture']]);
             }
-            
+
             return $user;
         });
     }
@@ -395,16 +490,16 @@ class AuthService
         if (!Hash::check($password, $user->password)) {
             return false;
         }
-        
+
         // Deactivate account
         $user->update([
             'is_active' => false,
             'deactivated_at' => now(),
         ]);
-        
+
         // Notify user
         $user->notify(new AccountDeactivatedNotification);
-        
+
         return true;
     }
 
@@ -435,7 +530,7 @@ class AuthService
         if (!Hash::check($password, $user->password)) {
             return false;
         }
-        
+
         return DB::transaction(function () use ($user) {
             // Delete user
             return $user->delete();
@@ -451,23 +546,23 @@ class AuthService
     public function generateTwoFactorSecret(User $user): array
     {
         $google2fa = app('pragmarx.google2fa');
-        
+
         // Generate new secret
         $secret = $google2fa->generateSecretKey();
-        
+
         // Store secret
         $user->update([
             'two_factor_secret' => $secret,
             'two_factor_recovery_codes' => json_encode($this->generateRecoveryCodes()),
         ]);
-        
+
         // Generate QR code URL
         $qrCodeUrl = $google2fa->getQRCodeUrl(
             config('app.name'),
             $user->email,
             $secret
         );
-        
+
         return [
             'secret' => $secret,
             'qr_code_url' => $qrCodeUrl,
@@ -485,18 +580,18 @@ class AuthService
     public function enableTwoFactor(User $user, string $code): bool
     {
         $google2fa = app('pragmarx.google2fa');
-        
+
         // Verify code
         $valid = $google2fa->verifyKey($user->two_factor_secret, $code);
-        
+
         if ($valid) {
             $user->update([
                 'two_factor_enabled' => true,
             ]);
-            
+
             return true;
         }
-        
+
         return false;
     }
 
@@ -513,13 +608,13 @@ class AuthService
         if (!Hash::check($password, $user->password)) {
             return false;
         }
-        
+
         $user->update([
             'two_factor_enabled' => false,
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
         ]);
-        
+
         return true;
     }
 
@@ -533,21 +628,21 @@ class AuthService
     public function verifyTwoFactorCode(User $user, string $code): bool
     {
         $google2fa = app('pragmarx.google2fa');
-        
+
         // Check if code is a recovery code
         $recoveryCodes = json_decode($user->two_factor_recovery_codes, true);
-        
+
         if (in_array($code, $recoveryCodes)) {
             // Remove used recovery code
             $recoveryCodes = array_diff($recoveryCodes, [$code]);
-            
+
             $user->update([
                 'two_factor_recovery_codes' => json_encode($recoveryCodes),
             ]);
-            
+
             return true;
         }
-        
+
         // Verify code
         return $google2fa->verifyKey($user->two_factor_secret, $code);
     }
@@ -561,11 +656,11 @@ class AuthService
     private function generateRecoveryCodes(int $count = 8): array
     {
         $codes = [];
-        
+
         for ($i = 0; $i < $count; $i++) {
             $codes[] = Str::random(10);
         }
-        
+
         return $codes;
     }
 

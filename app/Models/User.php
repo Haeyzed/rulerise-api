@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\UserRoleEnum;
 use App\Services\Storage\StorageService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -75,7 +76,7 @@ class User extends Authenticatable implements JWTSubject
      *
      * @return mixed
      */
-    public function getJWTIdentifier()
+    public function getJWTIdentifier(): mixed
     {
         return $this->getKey();
     }
@@ -85,7 +86,7 @@ class User extends Authenticatable implements JWTSubject
      *
      * @return array
      */
-    public function getJWTCustomClaims()
+    public function getJWTCustomClaims(): array
     {
         return [
             'role' => $this->role,
@@ -211,10 +212,10 @@ class User extends Authenticatable implements JWTSubject
     /**
      * Scope a query to only include active users.
      *
-     * @param \Illuminate\Database\Eloquent\Builder<User> $query
-     * @return \Illuminate\Database\Eloquent\Builder<User>
+     * @param Builder<User> $query
+     * @return Builder<User>
      */
-    public function scopeActive($query)
+    public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
     }
@@ -222,11 +223,11 @@ class User extends Authenticatable implements JWTSubject
     /**
      * Scope a query to only include users with a specific role.
      *
-     * @param \Illuminate\Database\Eloquent\Builder<User> $query
+     * @param Builder<User> $query
      * @param string $role
-     * @return \Illuminate\Database\Eloquent\Builder<User>
+     * @return Builder<User>
      */
-    public function scopeWithRole($query, $role)
+    public function scopeWithRole(Builder $query, string $role): Builder
     {
         return $query->where('role', $role);
     }

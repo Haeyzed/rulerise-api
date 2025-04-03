@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('candidate_id')->constrained('candidate_profiles')->cascadeOnDelete()->cascadeOnUpdate();
             $table->foreignId('skill_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
+            $table->integer('level')->nullable(); // Using string instead of ENUM
             $table->string('proficiency_level')->nullable(); // Using string instead of ENUM
             $table->timestamps();
 

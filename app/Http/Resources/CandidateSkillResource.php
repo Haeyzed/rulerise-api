@@ -25,22 +25,6 @@ class CandidateSkillResource extends JsonResource
             'id' => $this->id,
 
             /**
-             * The candidate ID associated with this skill.
-             *
-             * @var int $candidate_id
-             * @example 1
-             */
-            'candidate_id' => $this->candidate_id,
-
-            /**
-             * The skill ID.
-             *
-             * @var int $skill_id
-             * @example 1
-             */
-            'skill_id' => $this->skill_id,
-
-            /**
              * The skill details.
              *
              * @var array|null $skill

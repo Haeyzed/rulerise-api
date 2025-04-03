@@ -25,14 +25,6 @@ class CompanyResource extends JsonResource
             'id' => $this->id,
 
             /**
-             * The user ID who owns this company.
-             *
-             * @var int $user_id
-             * @example 1
-             */
-            'user_id' => $this->user_id,
-
-            /**
              * The name of the company.
              *
              * @var string $name
@@ -105,14 +97,6 @@ class CompanyResource extends JsonResource
             'industry' => $this->industry,
 
             /**
-             * The company size ID.
-             *
-             * @var int|null $company_size_id
-             * @example 3
-             */
-            'company_size_id' => $this->company_size_id,
-
-            /**
              * The company size details.
              *
              * @var array|null $company_size
@@ -136,14 +120,6 @@ class CompanyResource extends JsonResource
             'address' => $this->address,
 
             /**
-             * The city ID of the company.
-             *
-             * @var int|null $city_id
-             * @example 1
-             */
-            'city_id' => $this->city_id,
-
-            /**
              * The city details of the company.
              *
              * @var array|null $city
@@ -151,27 +127,11 @@ class CompanyResource extends JsonResource
             'city' => new CityResource($this->whenLoaded('city')),
 
             /**
-             * The state ID of the company.
-             *
-             * @var int|null $state_id
-             * @example 1
-             */
-            'state_id' => $this->state_id,
-
-            /**
              * The state details of the company.
              *
              * @var array|null $state
              */
             'state' => new StateResource($this->whenLoaded('state')),
-
-            /**
-             * The country ID of the company.
-             *
-             * @var int|null $country_id
-             * @example 1
-             */
-            'country_id' => $this->country_id,
 
             /**
              * The country details of the company.

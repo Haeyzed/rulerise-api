@@ -28,7 +28,7 @@ class UserResource extends JsonResource
              * The first name of the user.
              *
              * @var string $first_name
-             * @example "John"
+             * @example "Michael"
              */
             'first_name' => $this->first_name,
 
@@ -36,7 +36,7 @@ class UserResource extends JsonResource
              * The last name of the user.
              *
              * @var string $last_name
-             * @example "Doe"
+             * @example "Johnson"
              */
             'last_name' => $this->last_name,
 
@@ -44,7 +44,7 @@ class UserResource extends JsonResource
              * The full name of the user (first name + last name).
              *
              * @var string $full_name
-             * @example "John Doe"
+             * @example "Michael Johnson"
              */
             'full_name' => $this->full_name,
 
@@ -52,7 +52,7 @@ class UserResource extends JsonResource
              * The phone number of the user.
              *
              * @var string|null $phone
-             * @example "+1234567890"
+             * @example "+14155552671"
              */
             'phone' => $this->phone,
 
@@ -60,7 +60,7 @@ class UserResource extends JsonResource
              * The email address of the user.
              *
              * @var string $email
-             * @example "john.doe@example.com"
+             * @example "michael.johnson@example.com"
              */
             'email' => $this->email,
 
@@ -170,4 +170,3 @@ class UserResource extends JsonResource
         ];
     }
 }
-
